@@ -5,6 +5,12 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from common import require_writable_setup
+
+try:
+    require_writable_setup()
+except ValueError as error:
+    sys.exit(str(error))
 
 base = Path(__file__).resolve().parent
 settings_path = base / 'settings.json'

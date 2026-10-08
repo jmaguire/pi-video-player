@@ -2,7 +2,7 @@
 
 An illustrated Raspberry Pi 5 video-looping guide for an artist's graduate exhibition at Dutch Design Week, with a companion setup kit.
 
-**Read [the 16-page instruction manual](docs/Two-Screen-Exhibition-Manual.pdf) first.** It covers equipment, video exports, installation, portrait screens, sound, rehearsal, troubleshooting and a printable daily crew card on page 14.
+**Read [the 19-page instruction manual](docs/Two-Screen-Exhibition-Manual.pdf) first.** It covers equipment, video exports, installation, portrait screens, sound, rehearsal, troubleshooting and a printable daily crew card on page 14.
 
 ## Playback choices
 
@@ -27,10 +27,12 @@ bash install.sh
 
 Run as your ordinary desktop user. Do not add `sudo` before the installer; it requests elevated privileges only to install packages from the OS repositories. Internet is needed for package installation, but local playback works offline.
 
-Choose the wiring mode, display outputs and silent playback or one soundtrack. Copy the movies into `~/exhibit`:
+Choose the wiring mode, display outputs and silent playback or one soundtrack. Keep your existing filenames. Copy the movies into the folders inside `~/exhibit`:
 
-- Independent mode: `video-a.mp4` and `video-b.mp4`.
-- Shared mode: `shared.mp4`.
+- Independent mode: one MP4 in `A` and one MP4 in `B`.
+- Shared mode: one combined MP4 in `Shared`.
+
+Each folder must contain exactly one non-empty MP4. Hidden macOS metadata files are ignored. Multiple MP4s are rejected rather than choosing a version silently. Existing `video-a.mp4`, `video-b.mp4` and `shared.mp4` files directly in `~/exhibit` remain supported when the corresponding folder is empty.
 
 Click **Start Exhibit**, or run:
 
@@ -38,7 +40,11 @@ Click **Start Exhibit**, or run:
 python3 ~/exhibit/control.py start
 ```
 
-Reboot to verify automatic startup, then run the final artwork overnight with the exact exhibition hardware.
+**Before travelling, rehearse on the real Pi with the final files, monitors, cables, enclosure and sound.** Check overnight playback, monitor off/on recovery, slow screen startup, pop-ups, offline operation and the venue power cycle (manual page 13). Automated tests cannot establish these physical behaviours.
+
+## Updating an existing Pi
+
+Stop Exhibit, unlock protection if active and reboot. Replace the old `Home > exhibit-kit` folder with the new kit, then rerun `bash install.sh` inside it. Choose the wiring, outputs and sound again; reinstallation resets audio choices. Your movies are kept, including the earlier fixed-filename layout. Repeat the screen-recovery and startup rehearsal before protecting the card again.
 
 ## Operation
 
@@ -58,7 +64,11 @@ python3 ~/exhibit/control.py disable
 
 The installer creates desktop and application-menu **Start Exhibit** and **Stop Exhibit** controls. Normal mpv keyboard shortcuts are disabled to prevent accidental pauses. Use the controls above.
 
-Shut down from the Pi desktop before disconnecting its power. Power the monitors/controller before the Pi when starting. Keep a tested clone of the finished SD card available.
+Close with **two brief Pi 5 power-button presses in quick succession**, then wait for the shutdown cue verified in rehearsal before disconnecting power. Holding the button forces power off. Keep the button accessible in the plinth. Power the monitors/controller before the Pi when opening.
+
+The screen watcher keeps retrying without a startup timeout. When an assigned HDMI output disappears, it stops the players; after all required outputs settle, it restarts them so window placement rules reapply. Both independent loops restart from the beginning. Detection takes about a second, so a brief misplaced image can occur; a monitor that remains connected over HDMI while powered off cannot be detected. If recovery fails, turn both screens on and use **Start Exhibit**.
+
+For venue power cuts, a helper can enable **both root overlay and boot-partition protection** after all changes and the spare-card test (pages 16-17). Changes made with the overlay active disappear on reboot. Unlock both protections and reboot before changing artwork or settings; the installer and sound helper refuse protected setup changes. Clean shutdown remains the daily routine. Protect and boot-test both cards separately.
 
 ## What the kit changes
 
@@ -66,12 +76,25 @@ Shut down from the Pi desktop before disconnecting its power. Power the monitors
 - Adds native Wayland app-ID rules to `~/.config/labwc/rc.xml`, moving a player to its assigned output before fullscreen. Existing unrelated desktop settings are preserved.
 - Saves configuration backups in `~/exhibit/backups/<timestamp>`.
 - Creates `~/.config/systemd/user/exhibit-{a,b,shared}.service` player services, restarted five seconds after exit. Only services for the chosen mode are started.
-- Creates the `~/.config/autostart/exhibit.desktop` entry. It waits for required enabled displays and imports the desktop's Wayland environment before starting the services.
+- Creates `exhibit-monitor.service`, an ongoing user-level display watcher. It waits for required enabled outputs, stops players after detection/layout changes and restarts them after three stable observations.
+- Creates the `~/.config/autostart/exhibit.desktop` entry. It validates the movies, imports the desktop's Wayland environment and starts the watcher. Stop Exhibit stops the watcher before stopping players; startup does not enable services outside the desktop session.
 - Saves editable playback/audio settings and startup diagnostics under `~/exhibit`.
 
 It does not configure screen resolution, rotation, desktop auto login, monitor sleep timers or controller crops. Follow the manual for those settings. It keeps existing movies when reinstalled. Changing mode/output selection by rerunning the installer resets the kit's audio settings, which can then be selected again.
 
 Restart-on-exit cannot detect a player that is still running with a frozen image. Neither seamless loop joins nor playback performance is guaranteed. Those checks belong in the rehearsal.
+
+## Helper decoder check
+
+For the 4K shared route, run this on the Pi with the final movie:
+
+```sh
+python3 ~/exhibit/diagnose.py shared
+```
+
+It stops exhibition playback, launches the movie with the actual kit arguments, queries mpv's `hwdec-current` property, stops the trial and saves `~/exhibit/decoding.log`. A named hardware decoder confirms acceleration; `no` means software. This check cannot certify smooth playback. Click Start Exhibit afterwards.
+
+An AV helper can try `--decoder drm`; the trial does not change normal playback. If successful, set `hwdec_shared` to `drm` in `settings.json` while protection is off and repeat the normal playback rehearsal. Do not rely on a plain `mpv -v` test that omits the kit's decoder and Wayland settings.
 
 ## Files
 
@@ -80,7 +103,7 @@ Restart-on-exit cannot detect a player that is still running with a frozen image
 - `exhibit-kit/`: installer and runtime scripts, requiring only Python's standard library beyond OS packages.
 - `tools/build_manual.py`: editable text/layout source for the PDF.
 - `tools/package_kit.py`: creates the ZIP without cache or development files.
-- `tests/test_setup.py`: configuration preservation, installer and player-argument checks.
+- `tests/test_setup.py`: configuration preservation, installation, filenames, screen-recovery state transitions, Start / Stop ordering, protection guards and shared playback/diagnostic arguments.
 
 ## Developer checks and document build
 
@@ -105,4 +128,4 @@ The build uses Arial/DIN/Courier on macOS, with Liberation/DejaVu font fallbacks
 
 ## Validation status
 
-The scripts passed static syntax and configuration-logic tests; the PDF was rendered and visually reviewed. **No physical Raspberry Pi, video wall controller or venue monitors were available for playback validation.** The supplied guide requires a full rehearsal with the final artwork and hardware. Official references are linked on page 16.
+The scripts passed static syntax and configuration-logic tests; the PDF was rendered and visually reviewed. **No physical Raspberry Pi, video wall controller or venue monitors were available for playback validation.** The supplied guide requires a full rehearsal with the final artwork and hardware. Official references are linked on page 19.

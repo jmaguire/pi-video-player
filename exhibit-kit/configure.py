@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 
-from common import patch_rules, parse_outputs
+from common import patch_rules, parse_outputs, FOLDERS, require_writable_setup
 
 
 def choose(prompt, items, default=1):
@@ -34,12 +34,15 @@ def atomic_write(path, content):
 
 
 def main():
+    require_writable_setup()
     home = Path.home()
     kit = Path(__file__).resolve().parent
     exhibit = home / 'exhibit'
     config_home = Path(os.environ.get('XDG_CONFIG_HOME', str(home / '.config')))
     data_home = Path(os.environ.get('XDG_DATA_HOME', str(home / '.local/share')))
     exhibit.mkdir(exist_ok=True)
+    for folder in FOLDERS.values():
+        (exhibit / folder).mkdir(exist_ok=True)
     mode_index = choose('Choose your wiring (see pages 2 and 10 of the manual):', [
         'INDEPENDENT: one video per Pi HDMI port; no extra controller',
         'SHARED TIMELINE: one combined movie through an external video wall controller',
@@ -85,9 +88,11 @@ def main():
             shutil.copy2(path, backup / name)
     if original is None:
         (backup / 'NO_PREVIOUS_USER_RC.txt').write_text('No user rc.xml existed before this installation.\n')
+    subprocess.run(['systemctl', '--user', 'stop', 'exhibit-monitor.service'],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(['systemctl', '--user', 'stop', 'exhibit-a.service', 'exhibit-b.service',
                     'exhibit-shared.service'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    for name in ('common.py', 'control.py', 'player.py', 'audio.py'):
+    for name in ('common.py', 'control.py', 'player.py', 'audio.py', 'monitor.py', 'diagnose.py'):
         shutil.copy2(kit / name, exhibit / name)
     settings = {'mode': mode, 'output_a': output_a, 'output_b': output_b,
                 'audio_a': audio_index == 1, 'audio_b': False,
@@ -108,6 +113,17 @@ RestartSec=5s
 TimeoutStopSec=10s
 '''
         atomic_write(config_home / f'systemd/user/exhibit-{screen}.service', unit)
+    atomic_write(config_home / 'systemd/user/exhibit-monitor.service', '''[Unit]
+Description=Exhibition screen connection watcher
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 "%h/exhibit/monitor.py"
+Restart=always
+RestartSec=5s
+TimeoutStopSec=30s
+''')
     # Raspberry Pi OS's desktop session runs standard XDG autostart entries.
     desktop_base = '''[Desktop Entry]
 Type=Application
@@ -133,8 +149,9 @@ Categories=AudioVideo;
     subprocess.run(['labwc', '--reconfigure'], check=True)
     (exhibit / 'disabled').unlink(missing_ok=True)
     print('\nSETUP COMPLETE. Playback has not been started yet.')
-    print(f'Copy your movie file(s) to {exhibit}')
-    print('Use video-a.mp4 and video-b.mp4 for independent mode, or shared.mp4 for shared mode.')
+    print(f'Open {exhibit} in File Manager.')
+    print('Independent mode: put one MP4 in A and one in B. Shared mode: put one MP4 in Shared.')
+    print('Keep your own filenames. Older video-a.mp4 / video-b.mp4 / shared.mp4 files still work.')
     print('Then double-click Start Exhibit, or run: python3 ~/exhibit/control.py start')
     print('Desktop auto login and screen blanking are configured in Control Centre (manual page 7).')
     print(f'Configuration backups: {backup}')

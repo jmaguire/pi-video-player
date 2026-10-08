@@ -1,55 +1,93 @@
 TWO SCREENS / RASPBERRY PI 5 EXHIBITION KIT
 
-Read the illustrated PDF manual first. This kit runs on the Pi, not on your laptop.
+Read the illustrated PDF first. This kit runs on the Pi, not on your laptop.
+Daily crew card: page 14. Helper pages: 16-19.
 
-1. Install Raspberry Pi OS (64-bit) WITH DESKTOP, using Raspberry Pi Imager.
-2. Connect your screens and configure the desktop as described in the manual.
+1. Use Raspberry Pi OS (64-bit), Trixie, WITH DESKTOP, on a dedicated card.
+2. Connect the screens; set extended desktop, auto login and no blanking.
 3. Copy this entire exhibit-kit folder into Home on the Pi.
-4. Open Terminal on the Pi, and run these two lines one at a time:
+4. Open Terminal on the Pi with Ctrl + Alt + T. Run each line:
 
    cd ~/exhibit-kit
    bash install.sh
 
-5. Choose Independent for two Pi HDMI cables. Choose Shared only if a suitable,
-   preconfigured external video wall controller is connected (manual page 10).
-6. Copy your movies into Home > exhibit:
-   independent: video-a.mp4 and video-b.mp4
-   shared: shared.mp4
-7. Click Start Exhibit. Reboot and complete the overnight test before installation.
+   To paste into Terminal, use Ctrl + Shift + V. Run without sudo before bash;
+   the installer asks for your password when installing OS packages.
+5. Choose Independent for two direct Pi HDMI cables. Choose Shared only with
+   a suitable, preconfigured cropping video wall controller (pages 10-11).
+6. Open Home > exhibit. Keep your own filenames:
+   independent: ONE MP4 in A, ONE MP4 in B
+   shared: ONE combined MP4 in Shared
+   Move older versions out of those folders. Hidden macOS files are ignored.
+   Earlier video-a.mp4 / video-b.mp4 / shared.mp4 files directly in exhibit
+   still work when their corresponding folder is empty.
+7. Click Start Exhibit. Reboot and do the REAL-HARDWARE rehearsal on page 13.
+   Test the final videos overnight, monitor off/on, slow startup, offline
+   playback, notifications and the actual venue power arrangement.
 
-The installer asks for your Pi password to install packages from the OS repository.
-It adds backed-up labwc rules, user-level systemd player services and one desktop
-autostart entry. It creates Start Exhibit and Stop Exhibit controls. It does not
-alter boot firmware, copy your movies or configure screen resolution/auto login.
-All movie audio is disabled unless you choose sound during setup.
+UPDATING AN EARLIER KIT
+Stop playback; unlock both protections if active and reboot. Replace the old
+Home > exhibit-kit folder with this version. Run the installer again and choose
+wiring, outputs and sound. Movies are kept; audio choices reset. Rehearse again.
 
-RUNNING THE EXHIBIT
+DAILY OPERATION
+Open: turn screens/controller on, choose inputs, then power the Pi.
+Close: two BRIEF Pi 5 power-button presses in quick succession. Wait for the
+shutdown cue verified in rehearsal, then another 10 seconds before power-off.
+Do not hold the button. Keep it reachable. No need to stop the videos first.
+Never remove the Pi's SD card while powered.
+
+The watcher waits indefinitely for the assigned HDMI outputs. If one disappears,
+it stops the players and restarts them after all required outputs settle. Both
+independent movies restart from the beginning. A brief misplaced image may occur
+before detection. Screen-off with HDMI still connected cannot be detected.
+Fallback: turn both screens on and click Start Exhibit.
+
+CONTROLS / HELPER
 Start:   python3 ~/exhibit/control.py start
 Stop:    python3 ~/exhibit/control.py stop
 Sound:   python3 ~/exhibit/audio.py
 Disable future automatic starts:
          python3 ~/exhibit/control.py disable
-Clicking Start Exhibit enables automatic starts again.
-Stop only lasts for this desktop session; videos start after the next normal boot.
-Normal player shortcuts are disabled. Use Stop Exhibit instead of the q key.
+Start Exhibit re-enables automatic starts. Stop lasts until the next normal boot.
+Normal player keys are disabled. Use Stop Exhibit rather than q or Escape.
 
 DIAGNOSTICS FOR A HELPER
 wlr-randr
-systemctl --user status exhibit-a.service exhibit-b.service exhibit-shared.service
-journalctl --user -u exhibit-a.service -u exhibit-b.service -u exhibit-shared.service -n 80 --no-pager
+systemctl --user status exhibit-monitor.service exhibit-a.service exhibit-b.service exhibit-shared.service
+journalctl --user -u 'exhibit-*' -n 80 --no-pager
 cat ~/exhibit/startup.log
 vcgencmd get_throttled
 
-NEVER hot-unplug the SD card. Shut down the Pi from its desktop menu before
-disconnecting power. Power the screens/controller before the Pi when starting.
+4K shared-file decoder check (stops playback; click Start Exhibit afterwards):
+python3 ~/exhibit/diagnose.py shared
+Optional AV trial, does not save a setting:
+python3 ~/exhibit/diagnose.py shared --decoder drm
+The check uses actual kit arguments and queries mpv's active decoder. A named
+hardware decoder confirms acceleration; no means software; unknown needs help.
+Read decoding.log. If the drm trial works, the AV helper can set hwdec_shared to
+drm in settings.json while unlocked, then test normal playback again. A decoder
+check does not establish smoothness or correct loop joins.
 
-LIMITS
-Independent players are not synchronized. Shared mode plays a SINGLE movie into
-one HDMI input; a separate controller must crop it into two pictures. It does not
-span a window across the Pi's two HDMI ports. Restart-on-exit does not detect a
-frozen image if mpv is still running. No gapless loop or playback performance is
-guaranteed: the exact movies, screen settings and hardware must be tested.
+PROTECTED EXHIBITION MODE / HELPER ONLY
+Make and boot-test a working spare first (page 16). With the final files/settings:
+Preferences > Control Centre > Performance > Overlay File System > Configure.
+Enable BOTH Use Overlay and Write-protect Boot Partition. Save and reboot.
+Check:
+findmnt -n -o FSTYPE /
+findmnt -n -o OPTIONS /boot/firmware
+Expect overlay, and ro as a whole mount option. Rehearse and label each card.
+To change anything: turn BOTH protections off, reboot and verify / is no longer
+overlay and /boot/firmware has rw. Make changes, test, refresh the spare, protect
+again and reboot-test. Changes made while overlay is active disappear at reboot.
+Installer/sound configuration refuses protected changes. Disable's persistent
+marker also cannot survive reboot when created in an active overlay.
+Protection reduces interrupted writes; it does not eliminate storage failures.
+Clean shutdown remains the normal closing routine.
 
-VALIDATION
-The scripts have been statically checked and their configuration logic tested.
-They have not been run on a physical Raspberry Pi in this session.
+LIMITS AND VALIDATION
+Independent loops are not synchronized. Shared mode needs one combined movie
+and a professional cropping controller; budget for rental and AV configuration.
+Restart-on-exit cannot detect an image frozen inside a still-running player.
+No seamless join or playback performance is guaranteed. Scripts have automated
+logic tests, but this kit has NOT been tested on a physical Raspberry Pi.

@@ -13,9 +13,19 @@ if [ -z "${WAYLAND_DISPLAY:-}" ] || ! pgrep -x labwc > /dev/null; then
   echo 'Open Terminal inside the Raspberry Pi OS labwc desktop and try again.'
   exit 1
 fi
+EXHIBIT_KIT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# Check before apt: installs into an active overlay disappear at reboot.
+python3 - "$EXHIBIT_KIT_DIR" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from common import require_writable_setup
+try:
+    require_writable_setup()
+except ValueError as error:
+    sys.exit(str(error))
+PY
 echo 'Installing the video player and display tools. Internet is needed for this step.'
 echo 'If a password is requested, type your Pi password. No letters will appear.'
 sudo apt-get update
 sudo apt-get install -y mpv wlr-randr ffmpeg python3 zenity
-EXHIBIT_KIT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 python3 "$EXHIBIT_KIT_DIR/configure.py"

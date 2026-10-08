@@ -7,11 +7,17 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import time
-from common import parse_outputs
+from common import movie_path
 
 BASE = Path(__file__).resolve().parent
 UNITS = ['exhibit-a.service', 'exhibit-b.service', 'exhibit-shared.service']
+MONITOR = 'exhibit-monitor.service'
+
+
+def stop_players():
+    # The watcher must stop first, otherwise it could undo Stop Exhibit.
+    systemctl('stop', MONITOR, check=False)
+    systemctl('stop', *UNITS)
 
 
 def systemctl(*args, check=True):
@@ -42,42 +48,20 @@ def start(automatic=False):
             return
         settings = json.loads((BASE / 'settings.json').read_text())
         separate = settings['mode'] == 'independent'
-        filenames = ['video-a.mp4', 'video-b.mp4'] if separate else ['shared.mp4']
-        for name in filenames:
-            path = BASE / name
-            if not path.is_file() or path.stat().st_size == 0:
-                raise ValueError(f'Missing or empty movie: {name}. Put it in Home > exhibit, then click Start Exhibit.')
+        stop_players()
+        screens = ('a', 'b') if separate else ('shared',)
+        for screen in screens:
+            path = movie_path(BASE, screen)
             probe = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0',
                                     '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', str(path)],
                                    text=True, capture_output=True, timeout=30)
             if probe.returncode or 'video' not in probe.stdout:
-                raise ValueError(f'{name} cannot be read as a video. Copy it again or export a fresh MP4.')
-        required = {settings['output_a']}
-        if separate:
-            required.add(settings['output_b'])
-        # Power the screens before the Pi. This wait allows detection to settle.
-        for _ in range(90):
-            if (BASE / '.stop-requested').exists():
-                return
-            result = subprocess.run(['wlr-randr'], text=True, capture_output=True, timeout=5)
-            enabled = {o['name'] for o in parse_outputs(result.stdout) if o['enabled']}
-            if required <= enabled:
-                break
-            time.sleep(1)
-        else:
-            raise ValueError('A required display was not detected within 90 seconds. Turn on both screens '
-                             '(or the controller), check HDMI inputs and Screens settings, then click Start Exhibit.')
+                raise ValueError(f'{path.name} cannot be read as a video. Copy it again or export a fresh MP4.')
         env_names = [name for name in ('WAYLAND_DISPLAY', 'DISPLAY', 'XDG_RUNTIME_DIR', 'XDG_SESSION_TYPE')
                      if name in os.environ]
         systemctl('import-environment', *env_names)
-        time.sleep(2)
-        if (BASE / '.stop-requested').exists():
-            return
-        inactive = ['exhibit-shared.service'] if separate else ['exhibit-a.service', 'exhibit-b.service']
-        active = ['exhibit-a.service', 'exhibit-b.service'] if separate else ['exhibit-shared.service']
-        systemctl('stop', *inactive)
-        systemctl('restart', *active)
-        (BASE / 'startup.log').write_text(str(datetime.datetime.now()) + '\nPlayback started.\n')
+        if not (BASE / '.stop-requested').exists():
+            systemctl('restart', MONITOR)
 
 
 def main():
@@ -86,7 +70,9 @@ def main():
         (BASE / '.stop-requested').touch()
         if action == 'disable':
             (BASE / 'disabled').touch()
-        systemctl('stop', *UNITS)
+        with (BASE / '.start-lock').open('w') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            stop_players()
     elif action in ('start', 'autostart'):
         start(automatic=action == 'autostart')
     else:
