@@ -1,0 +1,55 @@
+TWO SCREENS / RASPBERRY PI 5 EXHIBITION KIT
+
+Read the illustrated PDF manual first. This kit runs on the Pi, not on your laptop.
+
+1. Install Raspberry Pi OS (64-bit) WITH DESKTOP, using Raspberry Pi Imager.
+2. Connect your screens and configure the desktop as described in the manual.
+3. Copy this entire exhibit-kit folder into Home on the Pi.
+4. Open Terminal on the Pi, and run these two lines one at a time:
+
+   cd ~/exhibit-kit
+   bash install.sh
+
+5. Choose Independent for two Pi HDMI cables. Choose Shared only if a suitable,
+   preconfigured external video wall controller is connected (manual page 10).
+6. Copy your movies into Home > exhibit:
+   independent: video-a.mp4 and video-b.mp4
+   shared: shared.mp4
+7. Click Start Exhibit. Reboot and complete the overnight test before installation.
+
+The installer asks for your Pi password to install packages from the OS repository.
+It adds backed-up labwc rules, user-level systemd player services and one desktop
+autostart entry. It creates Start Exhibit and Stop Exhibit controls. It does not
+alter boot firmware, copy your movies or configure screen resolution/auto login.
+All movie audio is disabled unless you choose sound during setup.
+
+RUNNING THE EXHIBIT
+Start:   python3 ~/exhibit/control.py start
+Stop:    python3 ~/exhibit/control.py stop
+Sound:   python3 ~/exhibit/audio.py
+Disable future automatic starts:
+         python3 ~/exhibit/control.py disable
+Clicking Start Exhibit enables automatic starts again.
+Stop only lasts for this desktop session; videos start after the next normal boot.
+Normal player shortcuts are disabled. Use Stop Exhibit instead of the q key.
+
+DIAGNOSTICS FOR A HELPER
+wlr-randr
+systemctl --user status exhibit-a.service exhibit-b.service exhibit-shared.service
+journalctl --user -u exhibit-a.service -u exhibit-b.service -u exhibit-shared.service -n 80 --no-pager
+cat ~/exhibit/startup.log
+vcgencmd get_throttled
+
+NEVER hot-unplug the SD card. Shut down the Pi from its desktop menu before
+disconnecting power. Power the screens/controller before the Pi when starting.
+
+LIMITS
+Independent players are not synchronized. Shared mode plays a SINGLE movie into
+one HDMI input; a separate controller must crop it into two pictures. It does not
+span a window across the Pi's two HDMI ports. Restart-on-exit does not detect a
+frozen image if mpv is still running. No gapless loop or playback performance is
+guaranteed: the exact movies, screen settings and hardware must be tested.
+
+VALIDATION
+The scripts have been statically checked and their configuration logic tested.
+They have not been run on a physical Raspberry Pi in this session.
